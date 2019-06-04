@@ -26,6 +26,63 @@ angular.module('copayApp.controllers').controller('indexController', function($r
   self.assetIndex = 0;
   self.$state = $state;
   self.usePushNotifications = isCordova && !isMobile.Windows();
+
+  self.totalUSDBalance = 0;
+  self.appStartupTimePassed = false;
+
+  var config = configService.getSync();
+  self.backupExceedingAmountUSD = config.backupExceedingAmountUSD;
+  self.isBackupReminderShutUp = config.isBackupReminderShutUp;
+
+  var today = new Date();
+  var lastTimeBackupReminderShown = new Date(config.lastTimeBackupReminderShown || 0);
+  self.wasTimeBackupReminderShownToday =
+    lastTimeBackupReminderShown.getFullYear() === today.getFullYear()
+    && lastTimeBackupReminderShown.getMonth() === today.getMonth()
+    && lastTimeBackupReminderShown.getDate() === today.getDate();
+
+  self.calculateTotalUsdBalance = function () {
+    var exchangeRates = require('ocore/network.js').exchangeRates;
+    var totalUSDBalance = 0;
+
+    for (var balance of self.arrBalances){
+      if (!balance.pending && balance.asset === 'base' && exchangeRates.GBYTE_USD && balance.total) {
+        totalUSDBalance += balance.total / 1e9 * exchangeRates.GBYTE_USD;
+      } else if (!balance.pending && balance.asset === self.BLACKBYTES_ASSET && exchangeRates.GBB_USD && balance.total) {
+        totalUSDBalance += balance.total / 1e9 * exchangeRates.GBB_USD;
+      } else if (!balance.pending && exchangeRates[balance.asset + '_USD'] && balance.total) {
+        totalUSDBalance += balance.total / Math.pow(10, balance.decimals || 0) * exchangeRates[balance.asset + '_USD'];
+      }
+    }
+
+    self.totalUSDBalance = totalUSDBalance;
+  }
+
+  $timeout(function () {
+    self.appStartupTimePassed = true
+  }, 60 * 1000);
+
+  self.dismissBackupReminder = function () {
+    self.wasTimeBackupReminderShownToday = true
+    configService.set({ lastTimeBackupReminderShown: new Date().getTime() }, function(err) {
+      if (err) {
+        $log.debug(err);
+      }
+    });
+    $timeout(function () {
+      self.wasTimeBackupReminderShownToday = false
+    }, 86400 * 1000)
+  }
+
+  self.shutupBackupReminder = function () {
+    self.isBackupReminderShutUp = true
+    configService.set({ isBackupReminderShutUp: true }, function(err) {
+      if (err) {
+        $log.debug(err);
+      }
+    });
+  }
+
     /*
     console.log("process", process.env);
     var os = require('os');
@@ -176,6 +233,7 @@ angular.module('copayApp.controllers').controller('indexController', function($r
 	}
 
 	eventBus.on('rates_updated', function(){
+    self.calculateTotalUsdBalance();
 		$timeout(function() {
 			$rootScope.$apply();
 		});
@@ -1202,6 +1260,9 @@ angular.module('copayApp.controllers').controller('indexController', function($r
       self.pendingAmountStr = null;
     }
       */
+
+    self.calculateTotalUsdBalance();
+
     $timeout(function() {
       $rootScope.$apply();
     });

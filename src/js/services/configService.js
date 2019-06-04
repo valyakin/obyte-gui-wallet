@@ -92,6 +92,8 @@ angular.module('copayApp.services').factory('configService', function(storageSer
 		return isCordova ? cordova.plugins.deviceName.name : require('os').hostname();
 	},
 
+	backupExceedingAmountUSD: 10,
+
 	// wallet default config
 	wallet: {
 	  requiredCosigners: 2,
@@ -245,6 +247,8 @@ angular.module('copayApp.services').factory('configService', function(storageSer
 		}
 		if (!_config.deviceName)
 			_config.deviceName = defaultConfig.getDeviceName();
+		if (!_config.backupExceedingAmountUSD)
+			_config.backupExceedingAmountUSD = defaultConfig.backupExceedingAmountUSD;
 
 		checkAndReplaceOldUnitCode(_config.wallet.settings);
 	} else {
